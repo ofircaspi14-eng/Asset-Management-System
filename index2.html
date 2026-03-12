@@ -619,7 +619,7 @@ async function renderContracts() {
     else if (days <= 30) db2 = `<span class="days-badge" style="background:var(--red-50);color:var(--red-800);">${days} יום נותרו</span>`;
     else if (days <= 90) db2 = `<span class="days-badge" style="background:var(--amber-50);color:var(--amber-800);">${days} יום נותרו</span>`;
     else db2 = `<span class="days-badge" style="background:var(--green-50);color:var(--green-800);">${days} יום נותרו</span>`;
-    return `<div class="contract-card"><div class="contract-top"><div><div class="contract-tenant">${c.tenant_name}</div><div class="contract-addr">${propLabel(c.prop_id)}</div></div>${db2}</div>
+    return `<div class="contract-card"><div class="contract-top"><div><div class="contract-tenant">${c.tenant_name}</div><div class="contract-addr">${propLabel(c.prop_id)}</div></div><div style="display:flex;gap:8px;align-items:center;">${db2}<button onclick="editContract('${c.id}')" style="font-size:12px;padding:5px 12px;border-radius:6px;background:var(--teal-50);border:0.5px solid var(--teal-100);color:var(--teal-800);cursor:pointer;">✏️ ערוך</button><button onclick="deleteContract('${c.id}')" style="font-size:12px;padding:5px 12px;border-radius:6px;background:var(--red-50);border:0.5px solid var(--red-100);color:var(--red-800);cursor:pointer;">🗑️</button></div></div>
     <div class="contract-grid">
       <div class="cf"><label>תחילת חוזה</label><span>${formatDate(c.start_date)}</span></div>
       <div class="cf"><label>סיום חוזה</label><span>${formatDate(c.end_date)}</span></div>
@@ -670,6 +670,74 @@ function onContractFileSelected(input) {
   label.style.color = 'var(--teal-600)';
   document.getElementById('contract-upload-area').style.borderColor = 'var(--teal-600)';
   document.getElementById('contract-upload-area').style.background = '#d0ece3';
+}
+
+async function deleteContract(id) {
+  if (!confirm('למחוק את החוזה? פעולה זו אינה ניתנת לביטול.')) return;
+  const { error } = await db.from('contracts').delete().eq('id', id);
+  if (error) { toast('שגיאה במחיקה'); return; }
+  toast('החוזה נמחק ✓');
+  renderContracts();
+}
+
+async function editContract(id) {
+  const { data: contracts } = await db.from('contracts').select('*').eq('id', id);
+  const c = contracts?.[0];
+  if (!c) return;
+
+  // Fill the add-contract form with existing data
+  showTab('add-contract');
+  setTimeout(() => {
+    document.getElementById('c-prop').value  = c.prop_id;
+    document.getElementById('c-tenant').value = c.tenant_name || '';
+    document.getElementById('c-phone').value  = c.tenant_phone || '';
+    document.getElementById('c-email').value  = c.tenant_email || '';
+    document.getElementById('c-start').value  = c.start_date || '';
+    document.getElementById('c-end').value    = c.end_date || '';
+    document.getElementById('c-rent').value   = c.rent_amount || '';
+    document.getElementById('c-day').value    = c.payment_day || '';
+    document.getElementById('c-deposit').value = c.deposit || '';
+    document.getElementById('c-id').value     = c.tenant_id || '';
+    document.getElementById('c-notes').value  = c.notes || '';
+
+    // Change title and button to "update"
+    document.querySelector('#tab-add-contract .form-title').textContent = 'עריכת חוזה';
+    const btn = document.querySelector('#tab-add-contract .btn-primary');
+    btn.textContent = 'עדכן חוזה';
+    btn.onclick = () => updateContract(id);
+
+    updateContractSummary();
+  }, 100);
+}
+
+async function updateContract(id) {
+  const prop   = document.getElementById('c-prop').value;
+  const tenant = document.getElementById('c-tenant').value.trim();
+  const start  = document.getElementById('c-start').value;
+  const end    = document.getElementById('c-end').value;
+  const rent   = document.getElementById('c-rent').value;
+  if (!prop || !tenant || !start || !end || !rent) { toast('אנא מלא את כל שדות החובה'); return; }
+
+  const { error } = await db.from('contracts').update({
+    prop_id: +prop, tenant_name: tenant, start_date: start, end_date: end,
+    rent_amount: +rent, tenant_phone: document.getElementById('c-phone').value,
+    tenant_email: document.getElementById('c-email').value,
+    payment_day: +document.getElementById('c-day').value || null,
+    deposit: +document.getElementById('c-deposit').value || null,
+    tenant_id: document.getElementById('c-id').value,
+    notes: document.getElementById('c-notes').value,
+  }).eq('id', id);
+
+  if (error) { toast('שגיאה בעדכון: ' + error.message); return; }
+
+  // Reset form title and button
+  document.querySelector('#tab-add-contract .form-title').textContent = 'הוסף חוזה שכירות חדש';
+  const btn = document.querySelector('#tab-add-contract .btn-primary');
+  btn.textContent = 'שמור חוזה';
+  btn.onclick = saveContract;
+
+  toast('החוזה עודכן בהצלחה ✓');
+  showTab('contracts');
 }
 
 async function saveContract() {

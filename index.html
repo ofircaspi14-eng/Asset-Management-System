@@ -1143,5 +1143,150 @@ async function inviteUser() {
   renderUsers();
 }
 </script>
+
+<!-- STICKY NOTE -->
+<div id="sticky-note" style="
+  position:fixed;
+  left:20px;
+  top:200px;
+  width:220px;
+  background:#FFF9C4;
+  border-radius:4px;
+  box-shadow:2px 4px 12px rgba(0,0,0,0.15);
+  z-index:9000;
+  display:none;
+  flex-direction:column;
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+">
+  <div id="sticky-header" style="
+    background:#F9E84A;
+    padding:8px 12px;
+    border-radius:4px 4px 0 0;
+    cursor:grab;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    user-select:none;
+  ">
+    <span style="font-size:13px;font-weight:500;color:#555;">📝 פתק</span>
+    <div style="display:flex;gap:6px;">
+      <button onclick="toggleStickyMinimize()" style="background:none;border:none;cursor:pointer;font-size:14px;padding:0;color:#666;" title="מזער">—</button>
+      <button onclick="closeSticky()" style="background:none;border:none;cursor:pointer;font-size:14px;padding:0;color:#666;" title="סגור">✕</button>
+    </div>
+  </div>
+  <div id="sticky-body" style="padding:10px;">
+    <textarea id="sticky-text" placeholder="כתוב פה הערות חופשיות..." style="
+      width:100%;
+      min-height:140px;
+      border:none;
+      background:transparent;
+      resize:vertical;
+      font-size:13px;
+      font-family:inherit;
+      color:#333;
+      outline:none;
+      direction:rtl;
+      line-height:1.5;
+    "></textarea>
+  </div>
+</div>
+
+<!-- STICKY TOGGLE BUTTON -->
+<button id="sticky-toggle-btn" onclick="toggleSticky()" style="
+  position:fixed;
+  left:20px;
+  bottom:24px;
+  width:48px;
+  height:48px;
+  border-radius:50%;
+  background:#F9E84A;
+  border:none;
+  box-shadow:0 4px 12px rgba(0,0,0,0.2);
+  cursor:pointer;
+  font-size:22px;
+  z-index:9001;
+  display:none;
+  align-items:center;
+  justify-content:center;
+" title="פתח פתק">📝</button>
+
+<script>
+// Show sticky note and button when app is visible
+function initSticky() {
+  const note = document.getElementById('sticky-note');
+  const btn  = document.getElementById('sticky-toggle-btn');
+  note.style.display = 'flex';
+  btn.style.display  = 'flex';
+
+  // Restore saved text and position
+  const saved = localStorage.getItem('sticky_text');
+  if (saved) document.getElementById('sticky-text').value = saved;
+  const pos = JSON.parse(localStorage.getItem('sticky_pos') || 'null');
+  if (pos) { note.style.left = pos.left; note.style.top = pos.top; }
+  const hidden = localStorage.getItem('sticky_hidden') === '1';
+  if (hidden) { note.style.display = 'none'; btn.style.display = 'flex'; }
+
+  // Auto-save text
+  document.getElementById('sticky-text').addEventListener('input', () => {
+    localStorage.setItem('sticky_text', document.getElementById('sticky-text').value);
+  });
+}
+
+function toggleSticky() {
+  const note = document.getElementById('sticky-note');
+  const btn  = document.getElementById('sticky-toggle-btn');
+  note.style.display = 'flex';
+  btn.style.display  = 'none';
+  localStorage.setItem('sticky_hidden', '0');
+}
+
+function closeSticky() {
+  document.getElementById('sticky-note').style.display = 'none';
+  document.getElementById('sticky-toggle-btn').style.display = 'flex';
+  localStorage.setItem('sticky_hidden', '1');
+}
+
+function toggleStickyMinimize() {
+  const body = document.getElementById('sticky-body');
+  body.style.display = body.style.display === 'none' ? 'block' : 'none';
+}
+
+// Drag logic
+(function() {
+  const el = document.getElementById('sticky-note');
+  const handle = document.getElementById('sticky-header');
+  let dragging = false, ox = 0, oy = 0;
+
+  handle.addEventListener('mousedown', e => {
+    dragging = true;
+    ox = e.clientX - el.getBoundingClientRect().left;
+    oy = e.clientY - el.getBoundingClientRect().top;
+    handle.style.cursor = 'grabbing';
+    e.preventDefault();
+  });
+
+  document.addEventListener('mousemove', e => {
+    if (!dragging) return;
+    const x = e.clientX - ox;
+    const y = e.clientY - oy;
+    el.style.left = Math.max(0, Math.min(window.innerWidth - el.offsetWidth, x)) + 'px';
+    el.style.top  = Math.max(0, Math.min(window.innerHeight - 50, y)) + 'px';
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (!dragging) return;
+    dragging = false;
+    handle.style.cursor = 'grab';
+    localStorage.setItem('sticky_pos', JSON.stringify({ left: el.style.left, top: el.style.top }));
+  });
+})();
+
+// Init sticky after login
+const _origEnterApp = enterApp;
+enterApp = function(user) {
+  _origEnterApp(user);
+  setTimeout(initSticky, 300);
+};
+</script>
 </body>
 </html>

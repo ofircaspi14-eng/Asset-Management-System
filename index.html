@@ -5,11 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ניהול נכסים | אופיר כספי</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --teal-50:#E1F5EE;--teal-100:#9FE1CB;--teal-200:#5DCAA5;
-  --teal-600:#0F6E56;--teal-800:#085041;--teal-900:#04342C;
+  --teal-50:#EFF6FF;--teal-100:#BFDBFE;--teal-200:#93C5FD;
+  --teal-600:#2563EB;--teal-800:#1D4ED8;--teal-900:#1E3A8A;
   --amber-50:#FAEEDA;--amber-100:#FAC775;--amber-800:#633806;
   --coral-50:#FAECE7;--coral-100:#F5C4B3;--coral-600:#993C1D;--coral-800:#712B13;
   --red-50:#FCEBEB;--red-100:#F7C1C1;--red-600:#A32D2D;--red-800:#791F1F;
@@ -217,6 +218,17 @@ tr:hover td{background:#F8FAFC;}
       <h1>אופיר כספי — ניהול נכסים</h1>
       <p id="header-date"></p>
     </div>
+    <div id="header-stats" style="display:flex;gap:24px;align-items:center;flex:1;justify-content:center;">
+      <div style="text-align:center;">
+        <div style="font-size:10px;opacity:0.6;text-transform:uppercase;letter-spacing:0.6px;margin-bottom:3px;">הכנסה חודשית</div>
+        <div id="h-monthly" style="font-size:20px;font-weight:500;">₪0</div>
+      </div>
+      <div style="width:1px;height:34px;background:rgba(255,255,255,0.2);"></div>
+      <div style="text-align:center;">
+        <div style="font-size:10px;opacity:0.6;text-transform:uppercase;letter-spacing:0.6px;margin-bottom:3px;" id="h-year-label">הכנסה 2026</div>
+        <div id="h-yearly" style="font-size:20px;font-weight:500;">₪0</div>
+      </div>
+    </div>
     <div class="header-right">
       <span id="user-greeting" style="font-size:13px;opacity:0.75;"></span>
       <button class="btn-logout" onclick="doLogout()">יציאה</button>
@@ -269,13 +281,35 @@ tr:hover td{background:#F8FAFC;}
           <div class="fg"><label>שם השוכר</label><input type="text" id="c-tenant" placeholder="שם מלא" /></div>
           <div class="fg"><label>טלפון שוכר</label><input type="tel" id="c-phone" placeholder="050-0000000" /></div>
           <div class="fg"><label>מייל שוכר</label><input type="email" id="c-email" placeholder="tenant@email.com" /></div>
-          <div class="fg"><label>תחילת חוזה</label><input type="date" id="c-start" /></div>
-          <div class="fg"><label>סיום חוזה</label><input type="date" id="c-end" /></div>
-          <div class="fg"><label>שכר דירה חודשי (₪)</label><input type="number" id="c-rent" placeholder="3500" /></div>
+          <div class="fg"><label>תחילת חוזה</label><input type="date" id="c-start" onchange="autoCalcEnd()" oninput="autoCalcEnd()" onblur="autoCalcEnd()" /></div>
+          <div class="fg"><label>סיום חוזה <span style="font-size:11px;color:var(--teal-600);">(מחושב אוטומטית ל-12 חודש)</span></label>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <input type="date" id="c-end" onchange="updateContractSummary()" style="flex:1;" />
+              <button type="button" onclick="autoCalcEnd()" style="padding:8px 12px;background:var(--teal-50);border:0.5px solid var(--teal-100);border-radius:8px;color:var(--teal-800);font-size:12px;cursor:pointer;white-space:nowrap;">חשב 12 חודש</button>
+            </div>
+          </div>
+          <div class="fg"><label>שכר דירה חודשי (₪)</label><input type="number" id="c-rent" placeholder="3500" onchange="updateContractSummary()" oninput="updateContractSummary()" /></div>
           <div class="fg"><label>יום תשלום בחודש</label><input type="number" id="c-day" placeholder="1" min="1" max="28" /></div>
           <div class="fg"><label>פיקדון (₪)</label><input type="number" id="c-deposit" placeholder="7000" /></div>
           <div class="fg"><label>ת.ז. שוכר</label><input type="text" id="c-id" placeholder="000000000" /></div>
           <div class="fg full"><label>הערות</label><textarea id="c-notes" placeholder="בעלי חיים, חניה, תנאים מיוחדים..."></textarea></div>
+          <div class="fg full">
+            <label>העלאת חוזה סרוק (PDF / תמונה)</label>
+            <div id="contract-upload-area" onclick="document.getElementById('c-file').click()" style="border:2px dashed var(--teal-100);border-radius:8px;padding:20px;text-align:center;cursor:pointer;background:var(--teal-50);transition:all 0.15s;" onmouseover="this.style.borderColor='var(--teal-600)'" onmouseout="this.style.borderColor='var(--teal-100)'">
+              <div style="font-size:24px;margin-bottom:6px;">📎</div>
+              <div id="contract-upload-label" style="font-size:13px;color:var(--teal-800);font-weight:500;">לחץ להעלאת קובץ חוזה</div>
+              <div style="font-size:12px;color:var(--muted);margin-top:3px;">PDF, JPG, PNG — עד 20MB</div>
+            </div>
+            <input type="file" id="c-file" accept=".pdf,image/*" style="display:none;" onchange="onContractFileSelected(this)" />
+          </div>
+        </div>
+        <div id="contract-summary" style="display:none;background:var(--teal-50);border:0.5px solid var(--teal-100);border-radius:8px;padding:14px 18px;margin-top:16px;font-size:13px;color:var(--teal-800);">
+          <div style="font-weight:500;margin-bottom:8px;">סיכום החוזה</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+            <div><div style="font-size:11px;opacity:0.7;margin-bottom:2px;">הכנסה חודשית</div><div id="cs-monthly" style="font-weight:500;font-size:15px;"></div></div>
+            <div><div style="font-size:11px;opacity:0.7;margin-bottom:2px;">סה"כ לחוזה (12 חודש)</div><div id="cs-total" style="font-weight:500;font-size:15px;"></div></div>
+            <div><div style="font-size:11px;opacity:0.7;margin-bottom:2px;">תקופת החוזה</div><div id="cs-period" style="font-weight:500;font-size:15px;"></div></div>
+          </div>
         </div>
         <div class="form-actions">
           <button class="btn-primary" onclick="saveContract()">שמור חוזה</button>
@@ -350,12 +384,14 @@ tr:hover td{background:#F8FAFC;}
       <div class="form-card">
         <div class="form-title">הגדרות התראות מייל</div>
         <div class="form-grid">
-          <div class="fg full"><label>כתובת מייל לקבלת התראות</label><input type="email" id="notif-email" placeholder="ofir@email.com" /></div>
+          <div class="fg full"><label>כתובת מייל ראשית (אופיר)</label><input type="email" id="notif-email" placeholder="ofircaspi14@gmail.com" /></div>
           <div class="fg"><label>התרע X ימים לפני סיום חוזה</label><select id="notif-days"><option value="30">30 יום</option><option value="60">60 יום</option><option value="90" selected>90 יום</option></select></div>
         </div>
         <div class="form-actions">
           <button class="btn-primary" onclick="saveNotif()">שמור הגדרות</button>
+          <button class="btn-secondary" onclick="sendAllAlerts()" id="btn-send-alerts">📧 שלח התראות עכשיו</button>
         </div>
+        <div id="send-status" style="display:none;margin-top:12px;padding:10px 14px;border-radius:8px;font-size:13px;"></div>
       </div>
       <div class="section-title">חוזים שמתקרבים לסיום</div>
       <div id="notif-preview"></div>
@@ -514,15 +550,26 @@ async function renderDashboard() {
   const { data: contracts } = await db.from('contracts').select('*').neq('status', 'ended');
   const { data: finances } = await db.from('finances').select('*');
 
+  const curYear = new Date().getFullYear();
   let monthly = 0, annual = 0, expenses = 0, rented = 0;
   const activeByProp = {};
   (contracts || []).forEach(c => { activeByProp[c.prop_id] = c; monthly += +c.rent_amount; annual += +c.rent_amount * 12; rented++; });
   (finances || []).forEach(f => { if (f.type === 'expense') expenses += +f.amount; });
 
+  // Calendar year income from finances table
+  const yearIncome = (finances || [])
+    .filter(f => f.type === 'income' && f.date && f.date.startsWith(curYear.toString()))
+    .reduce((s, f) => s + +f.amount, 0);
+
   document.getElementById('s-monthly').textContent = '₪' + monthly.toLocaleString();
   document.getElementById('s-annual').textContent = '₪' + annual.toLocaleString();
   document.getElementById('s-expenses').textContent = '₪' + expenses.toLocaleString();
   document.getElementById('s-rented').textContent = rented + ' / 4';
+
+  // Update header stats
+  document.getElementById('h-monthly').textContent = '₪' + monthly.toLocaleString();
+  document.getElementById('h-yearly').textContent = '₪' + yearIncome.toLocaleString();
+  document.getElementById('h-year-label').textContent = `הכנסה ${curYear}`;
 
   document.getElementById('props-grid').innerHTML = PROPS.map(p => {
     const c = activeByProp[p.id];
@@ -583,8 +630,46 @@ async function renderContracts() {
       <div class="cf"><label>טלפון</label><span dir="ltr">${c.tenant_phone||'—'}</span></div>
       <div class="cf"><label>מייל</label><span dir="ltr">${c.tenant_email||'—'}</span></div>
       ${c.notes?`<div class="cf" style="grid-column:1/-1;"><label>הערות</label><span>${c.notes}</span></div>`:''}
+      ${c.contract_url?`<div class="cf" style="grid-column:1/-1;"><label>קובץ חוזה</label><a href="${c.contract_url}" target="_blank" style="color:var(--teal-600);font-size:13px;font-weight:500;">📎 צפה בחוזה הסרוק</a></div>`:''}
     </div></div>`;
   }).join('');
+}
+
+function autoCalcEnd() {
+  const start = document.getElementById('c-start').value;
+  if (!start) return;
+  const d = new Date(start);
+  d.setFullYear(d.getFullYear() + 1);
+  // subtract one day so 12 full months
+  d.setDate(d.getDate() - 1);
+  document.getElementById('c-end').value = d.toISOString().split('T')[0];
+  updateContractSummary();
+}
+
+function updateContractSummary() {
+  const rent = +document.getElementById('c-rent').value;
+  const start = document.getElementById('c-start').value;
+  const end = document.getElementById('c-end').value;
+  const summary = document.getElementById('contract-summary');
+  if (!rent || !start) { summary.style.display = 'none'; return; }
+  const months = end ? Math.round((new Date(end) - new Date(start)) / 86400000 / 30) : 12;
+  const total = rent * months;
+  const startFmt = formatDate(start);
+  const endFmt = end ? formatDate(end) : '—';
+  document.getElementById('cs-monthly').textContent = '₪' + rent.toLocaleString();
+  document.getElementById('cs-total').textContent = '₪' + total.toLocaleString();
+  document.getElementById('cs-period').textContent = `${startFmt} — ${endFmt}`;
+  summary.style.display = 'block';
+}
+
+function onContractFileSelected(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const label = document.getElementById('contract-upload-label');
+  label.textContent = `✓ ${file.name}`;
+  label.style.color = 'var(--teal-600)';
+  document.getElementById('contract-upload-area').style.borderColor = 'var(--teal-600)';
+  document.getElementById('contract-upload-area').style.background = '#d0ece3';
 }
 
 async function saveContract() {
@@ -594,15 +679,41 @@ async function saveContract() {
   const end = document.getElementById('c-end').value;
   const rent = document.getElementById('c-rent').value;
   if (!prop || !tenant || !start || !end || !rent) { toast('אנא מלא את כל שדות החובה'); return; }
+
+  // Upload contract file if selected
+  let contractUrl = null;
+  const fileInput = document.getElementById('c-file');
+  if (fileInput.files[0]) {
+    const file = fileInput.files[0];
+    const ext = file.name.split('.').pop();
+    const fileName = `contracts/${Date.now()}_${Math.random().toString(36).substr(2,6)}.${ext}`;
+    toast('מעלה קובץ חוזה...');
+    const { error: upErr } = await db.storage.from('receipts').upload(fileName, file);
+    if (!upErr) {
+      const { data: urlData } = db.storage.from('receipts').getPublicUrl(fileName);
+      contractUrl = urlData.publicUrl;
+    }
+  }
+
   const { error } = await db.from('contracts').insert({
     prop_id: +prop, tenant_name: tenant, start_date: start, end_date: end,
     rent_amount: +rent, tenant_phone: document.getElementById('c-phone').value,
     tenant_email: document.getElementById('c-email').value, payment_day: +document.getElementById('c-day').value||null,
     deposit: +document.getElementById('c-deposit').value||null, tenant_id: document.getElementById('c-id').value,
-    notes: document.getElementById('c-notes').value, status: 'active', created_by: currentUser.id
+    notes: document.getElementById('c-notes').value, status: 'active',
+    contract_url: contractUrl, created_by: currentUser.id
   });
   if (error) { toast('שגיאה בשמירה: ' + error.message); return; }
+
+  // Reset form
   ['c-prop','c-tenant','c-start','c-end','c-rent','c-phone','c-email','c-day','c-deposit','c-id','c-notes'].forEach(id => { document.getElementById(id).value=''; });
+  fileInput.value = '';
+  document.getElementById('contract-upload-label').textContent = 'לחץ להעלאת קובץ חוזה';
+  document.getElementById('contract-upload-label').style.color = 'var(--teal-800)';
+  document.getElementById('contract-upload-area').style.borderColor = 'var(--teal-100)';
+  document.getElementById('contract-upload-area').style.background = 'var(--teal-50)';
+  document.getElementById('contract-summary').style.display = 'none';
+
   toast('החוזה נשמר בהצלחה ✓');
   showTab('contracts');
 }
@@ -663,33 +774,31 @@ async function handleReceiptFile(file) {
   const content = document.getElementById('ai-result-content');
   preview.style.display = 'block';
   document.getElementById('receipt-actions').style.display = 'none';
-  content.innerHTML = `<div class="analyzing"><div class="spinner"></div>מנתח קבלה עם AI...</div>`;
+  content.innerHTML = `<div class="analyzing"><div class="spinner"></div>מנתח קבלה עם AI — עד 10 שניות...</div>`;
 
-  // Upload to Supabase Storage
-  const ext = file.name.split('.').pop();
-  const fileName = `${Date.now()}_${Math.random().toString(36).substr(2,8)}.${ext}`;
-  const { data: uploadData, error: uploadError } = await db.storage.from('receipts').upload(fileName, file);
-  if (uploadError) { content.innerHTML = `<div class="analyzing">שגיאה בהעלאה: ${uploadError.message}</div>`; return; }
-  const { data: urlData } = db.storage.from('receipts').getPublicUrl(fileName);
-  const fileUrl = urlData.publicUrl;
-
-  // Convert to base64 for Gemini
+  // Convert to base64 for Gemini FIRST (before upload, so AI works even if storage fails)
   const base64 = await fileToBase64(file);
   const mimeType = file.type || 'image/jpeg';
 
   // Call Gemini
-  const propNames = PROPS.map((p,i) => `${i}: ${p.city} רח' ${p.street}`).join(', ');
-  const prompt = `אתה מנתח קבלות עבור מנהל נכסים. הנכסים הם: ${propNames}.
-נתח את הקבלה הזו והחזר JSON בלבד (ללא markdown) עם השדות:
-{
-  "prop_id": מספר הנכס הכי מתאים (0-3) לפי כתובת בקבלה, אם לא ברור תחזיר 0,
-  "amount": סכום בשקלים (מספר בלבד),
-  "date": תאריך בפורמט YYYY-MM-DD,
-  "category": אחד מ: שכר דירה / תיקון-תחזוקה / ארנונה / ועד בית / ביטוח / שיפוץ / אחר,
-  "description": תיאור קצר של מה שנרכש/שולם,
-  "type": income או expense,
-  "confidence": גבוה / בינוני / נמוך
-}`;
+  const propNames = PROPS.map((p,i) => `${i}: ${p.city} רחוב ${p.street}`).join(', ');
+  const prompt = `You are analyzing a receipt for a property manager. The properties are: ${propNames}.
+Analyze this receipt image and return ONLY a valid JSON object (no markdown, no backticks, no explanation) with these exact fields:
+{"prop_id":0,"amount":0,"date":"2025-01-01","category":"אחר","description":"תיאור","type":"expense","confidence":"גבוה"}
+
+Rules:
+- prop_id: best matching property number 0-3 based on address in receipt, default 0
+- amount: number only in ILS (Israeli Shekels)
+- date: YYYY-MM-DD format
+- category: one of: שכר דירה, תיקון-תחזוקה, ארנונה, ועד בית, ביטוח, שיפוץ, אחר
+- description: short Hebrew description
+- type: "income" or "expense"
+- confidence: "גבוה" or "בינוני" or "נמוך"
+
+Return ONLY the JSON, nothing else.`;
+
+  let ai = null;
+  let fileUrl = '';
 
   try {
     const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_KEY}`, {
@@ -697,40 +806,77 @@ async function handleReceiptFile(file) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: [{ parts: [
-          { text: prompt },
-          { inline_data: { mime_type: mimeType, data: base64 } }
-        ]}]
+          { inline_data: { mime_type: mimeType, data: base64 } },
+          { text: prompt }
+        ]}],
+        generationConfig: { temperature: 0.1, maxOutputTokens: 512 }
       })
     });
+
+    if (!resp.ok) {
+      const err = await resp.json();
+      throw new Error(err.error?.message || `HTTP ${resp.status}`);
+    }
+
     const result = await resp.json();
-    const text = result.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
-    const clean = text.replace(/```json|```/g, '').trim();
-    const ai = JSON.parse(clean);
+    let text = result.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
-    pendingReceiptData = { ...ai, file_url: fileUrl, file_name: file.name };
+    // Robust JSON extraction
+    text = text.trim();
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error('לא נמצא JSON בתשובת ה-AI: ' + text.substring(0,100));
+    ai = JSON.parse(jsonMatch[0]);
 
-    const confColor = ai.confidence === 'גבוה' ? 'badge-green' : ai.confidence === 'בינוני' ? 'badge-amber' : 'badge-coral';
-    content.innerHTML = `
-      <div class="ai-result">
-        <div class="ai-row"><span class="ai-label">דירה מזוהה</span><span class="ai-val">${propLabel(ai.prop_id)}</span></div>
-        <div class="ai-row"><span class="ai-label">סכום</span><span class="ai-val">₪${(+ai.amount).toLocaleString()}</span></div>
-        <div class="ai-row"><span class="ai-label">תאריך</span><span class="ai-val">${formatDate(ai.date)}</span></div>
-        <div class="ai-row"><span class="ai-label">קטגוריה</span><span class="ai-val">${ai.category}</span></div>
-        <div class="ai-row"><span class="ai-label">תיאור</span><span class="ai-val">${ai.description}</span></div>
-        <div class="ai-row"><span class="ai-label">סוג</span><span class="ai-val">${ai.type === 'income' ? 'הכנסה' : 'הוצאה'}</span></div>
-        <div class="ai-row"><span class="ai-label">רמת ביטחון AI</span><span class="ai-val"><span class="badge ${confColor}">${ai.confidence}</span></span></div>
-      </div>
-      <p style="font-size:13px;color:var(--muted);margin-bottom:8px;">האם הנתונים נכונים? אשר כדי לשמור לרשומות הכספיות.</p>`;
-    document.getElementById('receipt-actions').style.display = 'flex';
+    // Validate required fields
+    if (ai.amount === undefined || ai.amount === null) ai.amount = 0;
+    if (!ai.date) ai.date = new Date().toISOString().split('T')[0];
+    if (!ai.category) ai.category = 'אחר';
+    if (!ai.description) ai.description = 'קבלה';
+    if (!ai.type) ai.type = 'expense';
+    if (!ai.confidence) ai.confidence = 'בינוני';
+    if (ai.prop_id === undefined || ai.prop_id === null) ai.prop_id = 0;
+    ai.prop_id = Math.max(0, Math.min(3, +ai.prop_id));
+    ai.amount = +ai.amount;
 
-    // Save receipt record
+  } catch(e) {
+    content.innerHTML = `<div class="analyzing" style="color:#991B1B;">שגיאה בניתוח AI:<br><small>${e.message}</small></div>`;
+    return;
+  }
+
+  // Upload to Supabase Storage (optional - continue even if fails)
+  try {
+    const ext = file.name.split('.').pop();
+    const fileName = `${Date.now()}_${Math.random().toString(36).substr(2,8)}.${ext}`;
+    const { error: uploadError } = await db.storage.from('receipts').upload(fileName, file);
+    if (!uploadError) {
+      const { data: urlData } = db.storage.from('receipts').getPublicUrl(fileName);
+      fileUrl = urlData.publicUrl;
+    }
+  } catch(e) { /* storage optional */ }
+
+  pendingReceiptData = { ...ai, file_url: fileUrl, file_name: file.name };
+
+  const confColor = ai.confidence === 'גבוה' ? 'badge-green' : ai.confidence === 'בינוני' ? 'badge-amber' : 'badge-coral';
+  content.innerHTML = `
+    <div class="ai-result">
+      <div class="ai-row"><span class="ai-label">דירה מזוהה</span><span class="ai-val">${propLabel(ai.prop_id)}</span></div>
+      <div class="ai-row"><span class="ai-label">סכום</span><span class="ai-val">₪${ai.amount.toLocaleString()}</span></div>
+      <div class="ai-row"><span class="ai-label">תאריך</span><span class="ai-val">${formatDate(ai.date)}</span></div>
+      <div class="ai-row"><span class="ai-label">קטגוריה</span><span class="ai-val">${ai.category}</span></div>
+      <div class="ai-row"><span class="ai-label">תיאור</span><span class="ai-val">${ai.description}</span></div>
+      <div class="ai-row"><span class="ai-label">סוג</span><span class="ai-val">${ai.type === 'income' ? 'הכנסה' : 'הוצאה'}</span></div>
+      <div class="ai-row"><span class="ai-label">רמת ביטחון AI</span><span class="ai-val"><span class="badge ${confColor}">${ai.confidence}</span></span></div>
+    </div>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:8px;">האם הנתונים נכונים? אשר כדי לשמור לרשומות הכספיות.</p>`;
+  document.getElementById('receipt-actions').style.display = 'flex';
+
+  // Save receipt record
+  try {
     await db.from('receipts').insert({
-      file_name: file.name, file_url: fileUrl, file_type: file.type,
+      file_name: file.name, file_url: fileUrl || 'no-file', file_type: file.type,
       ai_analysis: ai, status: 'pending', created_by: currentUser.id
     });
-  } catch(e) {
-    content.innerHTML = `<div class="analyzing">שגיאה בניתוח AI: ${e.message}</div>`;
-  }
+  } catch(e) { /* non-critical */ }
 }
 
 async function confirmReceipt() {
@@ -788,10 +934,17 @@ function fileToBase64(file) {
 }
 
 // =============================================
-// NOTIFICATIONS
+// NOTIFICATIONS + EMAILJS
 // =============================================
+const EMAILJS_SERVICE  = 'service_3u6xpml';
+const EMAILJS_TEMPLATE = 'template_0iawe1l';
+const EMAILJS_KEY      = 'NO8rGRZsdRtRGdDVK';
+
+// Init EmailJS
+emailjs.init(EMAILJS_KEY);
+
 async function renderNotifications() {
-  const days = localStorage.getItem('notif_days') || 90;
+  const days  = localStorage.getItem('notif_days')  || 90;
   const email = localStorage.getItem('notif_email') || '';
   document.getElementById('notif-days').value = days;
   if (email) document.getElementById('notif-email').value = email;
@@ -801,17 +954,94 @@ async function renderNotifications() {
   const upcoming = (contracts||[]).filter(c => { const d = daysUntil(c.end_date); return d >= 0 && d <= threshold; });
   const el = document.getElementById('notif-preview');
   el.innerHTML = upcoming.length
-    ? upcoming.map(c => { const d = daysUntil(c.end_date);
-      return `<div class="notif-email"><div class="email-icon">✉</div><div><strong>אל:</strong> ${email||'(לא הוגדר)'}<br><strong>נושא:</strong> התראה — חוזה ${propLabel(c.prop_id)} פג בעוד ${d} ימים<br><span style="color:var(--teal-600);">שוכר: ${c.tenant_name} · סיום: ${formatDate(c.end_date)} · שכ"ד: ₪${(+c.rent_amount).toLocaleString()}</span></div></div>`;
-    }).join('')
+    ? upcoming.map(c => {
+        const d = daysUntil(c.end_date);
+        const cls = d <= 30 ? 'danger' : 'warn';
+        return `<div class="alert-item ${cls}">
+          <span class="alert-dot"></span>
+          <div>
+            <strong>${propLabel(c.prop_id)}</strong> — ${c.tenant_name}<br>
+            <span style="font-size:12px;">סיום: ${formatDate(c.end_date)} · <strong>${d} ימים נותרו</strong> · שכ"ד: ₪${(+c.rent_amount).toLocaleString()}</span>
+          </div>
+          <div class="alert-actions">
+            <button style="font-size:12px;padding:5px 12px;border-radius:6px;border:0.5px solid currentColor;background:none;cursor:pointer;color:inherit;" onclick="sendSingleAlert('${c.id}','${c.tenant_name}','${propLabel(c.prop_id)}','${formatDate(c.end_date)}',${d},${c.rent_amount})">📧 שלח מייל</button>
+          </div>
+        </div>`;
+      }).join('')
     : `<div class="empty-state">אין חוזים הקרובים לפקיעה ב-${threshold} הימים הקרובים.</div>`;
 }
 
 function saveNotif() {
   localStorage.setItem('notif_email', document.getElementById('notif-email').value);
-  localStorage.setItem('notif_days', document.getElementById('notif-days').value);
+  localStorage.setItem('notif_days',  document.getElementById('notif-days').value);
   toast('הגדרות נשמרו ✓');
   renderNotifications();
+}
+
+async function sendSingleAlert(id, tenant, property, endDate, days, rent) {
+  const email = localStorage.getItem('notif_email') || document.getElementById('notif-email').value;
+  if (!email) { toast('אנא הכנס כתובת מייל בהגדרות'); return; }
+  try {
+    await emailjs.send(EMAILJS_SERVICE, EMAILJS_TEMPLATE, {
+      to_email:  email,
+      to_name:   'אופיר כספי',
+      name:      'מערכת ניהול נכסים',
+      email:     email,
+      property:  property,
+      tenant:    tenant,
+      end_date:  endDate,
+      days:      days,
+      rent:      '₪' + (+rent).toLocaleString(),
+    });
+    toast(`✓ מייל נשלח על חוזה ${property}`);
+  } catch(e) {
+    toast('שגיאה בשליחה: ' + (e.text || e.message));
+  }
+}
+
+async function sendAllAlerts() {
+  const email = localStorage.getItem('notif_email') || document.getElementById('notif-email').value;
+  if (!email) { toast('אנא הכנס כתובת מייל בהגדרות'); return; }
+  const days = +(localStorage.getItem('notif_days') || 90);
+  const { data: contracts } = await db.from('contracts').select('*').neq('status','ended');
+  const upcoming = (contracts||[]).filter(c => { const d = daysUntil(c.end_date); return d >= 0 && d <= days; });
+
+  if (!upcoming.length) { toast('אין חוזים שדורשים התראה כרגע'); return; }
+
+  const btn = document.getElementById('btn-send-alerts');
+  const statusEl = document.getElementById('send-status');
+  btn.disabled = true;
+  btn.textContent = 'שולח...';
+  statusEl.style.display = 'block';
+  statusEl.style.background = 'var(--teal-50)';
+  statusEl.style.color = 'var(--teal-800)';
+  statusEl.textContent = `שולח ${upcoming.length} התראות...`;
+
+  let sent = 0, failed = 0;
+  for (const c of upcoming) {
+    try {
+      await emailjs.send(EMAILJS_SERVICE, EMAILJS_TEMPLATE, {
+        to_email:  email,
+        to_name:   'אופיר כספי',
+        name:      'מערכת ניהול נכסים',
+        email:     email,
+        property:  propLabel(c.prop_id),
+        tenant:    c.tenant_name,
+        end_date:  formatDate(c.end_date),
+        days:      daysUntil(c.end_date),
+        rent:      '₪' + (+c.rent_amount).toLocaleString(),
+      });
+      sent++;
+    } catch(e) { failed++; }
+  }
+
+  btn.disabled = false;
+  btn.textContent = '📧 שלח התראות עכשיו';
+  statusEl.style.background = sent > 0 ? 'var(--green-50)' : 'var(--red-50)';
+  statusEl.style.color      = sent > 0 ? 'var(--green-800)' : 'var(--red-800)';
+  statusEl.textContent = sent > 0
+    ? `✓ נשלחו ${sent} מיילים בהצלחה${failed ? ` (${failed} נכשלו)` : ''}`
+    : `שגיאה — לא נשלחו מיילים`;
 }
 
 // =============================================
